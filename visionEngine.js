@@ -1,71 +1,131 @@
 /**
- * shared/species.js
+ * shared/visionEngine.js
  *
- * 犬・猫・人の視覚データ。DOMやReactに依存しない「純粋なJS」なので、
- * Web版(Canvas)でもネイティブ版(React Native + Skia)でもそのまま import して使える。
- *
- * ※ 実際の網膜知覚を厳密に再現するものではなく、二色型色覚・視力低下・
- *   広い視野・低照度感度といった実在の生物学的特徴を、教育目的で
- *   視覚的に近似したシミュレーションです。
+ * 「動物種のマトリクスをどう画素に適用するか」だけを担当する純粋関数群。
+ * Canvas ImageData(Web)にも、将来的な Skia ColorFilter(React Native)にも
+ * 同じ matrix/desaturate の数値をそのまま渡せるように設計している。
  */
 
-export const SPECIES = {
-  human: {
-    label: "ヒト",
-    en: "HUMAN",
-    color: "#ECE6D6",
-    glow: "rgba(236,230,214,0.35)",
-    pupil: "round",
-    // Web(Canvas)用: ctx.filter に渡す文字列
-    cssFilter: "none",
-    // 色変換用の 3x3 マトリクス。null = 変換なし
-    matrix: null,
-    // 変換後にどれだけ輝度方向へ寄せるか (0=そのまま, 1=完全グレー)
-    desaturate: 0,
-    tint: null,
-    data: {
-      acuity: "1.0（基準）",
-      color: "三色型 — フルカラーを知覚",
-      fov: "約180°",
-      note: "解像度・色彩認識ともに最も高い",
-    },
-  },
-  dog: {
-    label: "イヌ",
-    en: "DOG",
-    color: "#CBA135",
-    glow: "rgba(203,161,53,0.45)",
-    pupil: "round",
-    cssFilter: "contrast(1.05) brightness(1.08) blur(1px)",
-    // 赤と緑をほぼ同一視し、黄〜琥珀色に強く寄せる
-    matrix: [0.5, 0.5, 0, 0.5, 0.5, 0, 0.1, 0.1, 0.8],
-    desaturate: 0.35,
-    tint: { rgb: [203, 161, 53], strength: 0.4 },
-    data: {
-      acuity: "0.3前後（ヒトの20/75相当）",
-      color: "二色型 — 赤と緑の識別が苦手。青と黄を中心に知覚",
-      fov: "約240〜250°（広い周辺視野）",
-      note: "動体視力に優れ、薄暮でもよく見える",
-    },
-  },
-  cat: {
-    label: "ネコ",
-    en: "CAT",
-    color: "#6FB89A",
-    glow: "rgba(111,184,154,0.45)",
-    pupil: "slit",
-    cssFilter: "contrast(0.9) brightness(1.4) blur(2px)",
-    // 赤緑の分離をほぼ消し、青緑〜灰色寄りの世界にする
-    matrix: [0.35, 0.35, 0, 0.35, 0.35, 0, 0, 0.35, 0.9],
-    desaturate: 0.6,
-    tint: { rgb: [111, 184, 154], strength: 0.4 },
-    data: {
-      acuity: "0.1〜0.2前後（ヒトの20/100〜20/200相当）",
-      color: "二色型 — 赤の識別が弱く、青・黄が中心",
-      fov: "約200°",
-      note: "タペタム（輝板）により暗所視能力が非常に高い",
-    },
-  },
-};
+/**
+ * Web版: Canvas の ImageData に対して直接、色変換マトリクスと
+ * 彩度低減(desaturate)を適用する。in-place で書き換えて返す。
+ *
+ * @param {ImageData} imageData - ctx.getImageData() の戻り値
+ * @param {number[]} matrix - 3x3の色変換マトリクス(9要素, row-major)
+ * @param {number} desaturate - 0〜1。1に近いほどグレーに寄る
+ */
+export function applyColorMatrixToImageData(imageData, matrix, desaturate = 0) {
+  const d = imageData.data;
+  const m = matrix;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    let nr = m[0] * r + m[1] * g + m[2] * b;
+    let ng = m[3] * r + m[4] * g + m[5] * b;
+    let nb = m[6] * r + m[7] * g + m[8] * b;
+    if (desaturate > 0) {
+      const lum = 0.299 * nr + 0.587 * ng + 0.114 * nb;
+      nr += (lum - nr) * desaturate;
+      ng += (lum - ng) * desaturate;
+      nb += (lum - nb) * desaturate;
+    }
+    d[i] = nr;
+    d[i + 1] = ng;
+    d[i + 2] = nb;
+  }
+  return imageData;
+}
 
-export const SPECIES_KEYS = Object.keys(SPECIES);
+/**
+ * 将来のネイティブ版向け: 3x3マトリクスを Skia の ColorMatrix 形式
+ * (4x5 = 20要素, RGBA + オフセット)に変換するヘルパー。
+ *
+ * React Native + @shopify/react-native-skia を導入したら、
+ *   Skia.ColorFilter.MakeMatrix(toSkiaColorMatrix(species.matrix))
+ * のような形でそのまま同じ視覚データを使い回せる。
+ *
+ * desaturate(輝度寄せ)は Skia 側では別途「元マトリクスと
+ * グレースケール化マトリクスを線形補間」して事前計算するのが定石。
+ */
+export function toSkiaColorMatrix(matrix3x3) {
+  const [m11, m12, m13, m21, m22, m23, m31, m32, m33] = matrix3x3;
+  return [
+    m11, m12, m13, 0, 0,
+    m21, m22, m23, 0, 0,
+    m31, m32, m33, 0, 0,
+    0, 0, 0, 1, 0,
+  ];
+}
+
+/**
+ * 画像(Canvas / Video要素)を、指定サイズの正方形に「object-fit: cover」
+ * 相当でクロップして描画する。
+ */
+export function drawCover(ctx, source, sw, sh, dw, dh) {
+  if (!sw || !sh) return;
+  const sourceRatio = sw / sh;
+  const destRatio = dw / dh;
+  let sx = 0, sy = 0, cw = sw, ch = sh;
+  if (sourceRatio > destRatio) {
+    cw = sh * destRatio;
+    sx = (sw - cw) / 2;
+  } else {
+    ch = sw / destRatio;
+    sy = (sh - ch) / 2;
+  }
+  ctx.drawImage(source, sx, sy, cw, ch, 0, 0, dw, dh);
+}
+
+/**
+ * 輝度を保ったまま色味だけを混ぜる「色相/彩度だけ置き換え」処理。
+ * (Photoshopの「カラー」ブレンドモード相当を数値計算で再現)
+ *
+ * 前バージョンは単純に lum * tintColor を混ぜていたため、tint色自体の
+ * 明るさ(203や184など255未満)に引っ張られて全体が暗く見える不具合があった。
+ * tint色の輝度を測り、元画素の輝度に合わせてスケーリングすることで、
+ * 明るさを変えずに色味だけを足し込む。
+ *
+ * globalCompositeOperation のようなCanvas固有のブレンドAPIに頼らず、
+ * 純粋な数値計算だけで実装しているため、将来Skia側でも同じ結果を
+ * 再現できる。
+ *
+ * @param {ImageData} imageData
+ * @param {[number,number,number]} rgb - 足し込みたい色 (0-255)
+ * @param {number} strength - 0〜1
+ */
+export function applyTint(imageData, rgb, strength = 0) {
+  if (!strength) return imageData;
+  const d = imageData.data;
+  const [tr, tg, tb] = rgb;
+  // tint色そのものの輝度(これが小さいほど暗く引っ張られやすい)
+  const tintLum = 0.299 * tr + 0.587 * tg + 0.114 * tb || 1;
+  for (let i = 0; i < d.length; i += 4) {
+    const srcLum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    // 元画素と同じ明るさになるようtint色をスケーリング
+    const scale = srcLum / tintLum;
+    const tintedR = tr * scale;
+    const tintedG = tg * scale;
+    const tintedB = tb * scale;
+    d[i] = d[i] + (tintedR - d[i]) * strength;
+    d[i + 1] = d[i + 1] + (tintedG - d[i + 1]) * strength;
+    d[i + 2] = d[i + 2] + (tintedB - d[i + 2]) * strength;
+  }
+  return imageData;
+}
+
+/**
+ * Web版のメイン処理: source(video/image)を canvas に描画し、
+ * 指定した動物種の視覚マトリクスを適用する。
+ */
+export function applyVisionToCanvas(ctx, source, sw, sh, canvasSize, spec) {
+  ctx.save();
+  ctx.filter = spec.cssFilter;
+  drawCover(ctx, source, sw, sh, canvasSize, canvasSize);
+  ctx.restore();
+
+  if (spec.matrix) {
+    const imgData = ctx.getImageData(0, 0, canvasSize, canvasSize);
+    applyColorMatrixToImageData(imgData, spec.matrix, spec.desaturate || 0);
+    if (spec.tint) applyTint(imgData, spec.tint.rgb, spec.tint.strength);
+    ctx.putImageData(imgData, 0, 0);
+  }
+}
