@@ -103,15 +103,40 @@ export function drawCover(ctx, source, sw, sh, dw, dh) {
 }
 
 /**
+ * 縮小→拡大方式のぼかし。
+ * iOS Safari では ctx.filter の blur が長らく未対応のため、
+ * 小さく描いて引き伸ばす古典手法で光学的なボケを再現する。
+ * 描画結果のピクセルに焼き込まれるので、保存PNGにも反映される。
+ */
+let _blurCanvas = null;
+function drawWithBlur(ctx, source, sw, sh, canvasW, canvasH, blurPx) {
+  const k = Math.max(2, Math.round(blurPx * 2)); // 縮小1/kでボケ半径 ≒ k/2 px
+  const w = Math.max(16, Math.round(canvasW / k));
+  const h = Math.max(16, Math.round(canvasH / k));
+  if (!_blurCanvas) _blurCanvas = document.createElement("canvas");
+  _blurCanvas.width = w;
+  _blurCanvas.height = h;
+  const bctx = _blurCanvas.getContext("2d");
+  bctx.imageSmoothingEnabled = true;
+  drawCover(bctx, source, sw, sh, w, h);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(_blurCanvas, 0, 0, w, h, 0, 0, canvasW, canvasH);
+}
+
+/**
  * Web版のメイン処理。
- * blurPx > 0 なら描画パイプライン(ctx.filter)でぼかすため、
- * 保存されるPNGにもぼかしが反映される。
+ * blurPx > 0 なら縮小→拡大ぼかしを適用(iOS対応・保存PNGにも反映)。
+ * cssFilter(contrast/brightness)は対応ブラウザのみで効く軽い補正。
  */
 export function applyVisionToCanvas(ctx, source, sw, sh, canvasW, canvasH, spec, blurPx = 0) {
   ctx.save();
-  const blurPart = blurPx > 0 ? ` blur(${blurPx}px)` : "";
-  ctx.filter = ((spec.cssFilter === "none" ? "" : spec.cssFilter) + blurPart) || "none";
-  drawCover(ctx, source, sw, sh, canvasW, canvasH);
+  ctx.filter = spec.cssFilter || "none";
+  if (blurPx > 0) {
+    drawWithBlur(ctx, source, sw, sh, canvasW, canvasH, blurPx);
+  } else {
+    drawCover(ctx, source, sw, sh, canvasW, canvasH);
+  }
   ctx.restore();
 
   const m = effectiveMatrix(spec);
