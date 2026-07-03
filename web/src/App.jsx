@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Camera, Upload, Download, RotateCcw, X, AlertCircle, Aperture } from "lucide-react";
+import { Camera, Upload, Download, RotateCcw, X, AlertCircle, SwitchCamera } from "lucide-react";
 
 import { SPECIES } from "../../shared/species.js";
 import { applyVisionToCanvas } from "../../shared/visionEngine.js";
@@ -28,12 +28,14 @@ export default function App() {
   const [mode, setMode] = useState("cat");
   const [viewState, setViewState] = useState("idle");
   const [cameraError, setCameraError] = useState(null);
+  const [facing, setFacing] = useState("environment"); // environment=外カメ / user=インカメ
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const rafRef = useRef(null);
   const modeRef = useRef(mode);
+  const facingRef = useRef("environment");
   const uploadedImgRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -58,7 +60,16 @@ export default function App() {
     const canvas = canvasRef.current;
     if (video && canvas && video.videoWidth > 0) {
       const ctx = canvas.getContext("2d");
-      applyVision(ctx, video, video.videoWidth, video.videoHeight, modeRef.current);
+      if (facingRef.current === "user") {
+        // インカメは鏡像表示(セルフィーの自然な見え方)
+        ctx.save();
+        ctx.translate(CANVAS_W, 0);
+        ctx.scale(-1, 1);
+        applyVision(ctx, video, video.videoWidth, video.videoHeight, modeRef.current);
+        ctx.restore();
+      } else {
+        applyVision(ctx, video, video.videoWidth, video.videoHeight, modeRef.current);
+      }
     }
     rafRef.current = requestAnimationFrame(drawLoop);
   }, []);
@@ -74,12 +85,13 @@ export default function App() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  const startCamera = async () => {
+  const startCamera = async (facingMode = facing) => {
     setCameraError(null);
     uploadedImgRef.current = null;
+    stopCamera();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { facingMode },
         audio: false,
       });
       streamRef.current = stream;
@@ -93,6 +105,13 @@ export default function App() {
         "カメラにアクセスできませんでした。写真をアップロードして色味を確認してください。"
       );
     }
+  };
+
+  const handleFlipCamera = () => {
+    const next = facing === "environment" ? "user" : "environment";
+    setFacing(next);
+    facingRef.current = next;
+    startCamera(next);
   };
 
   const handleCapture = () => {
@@ -204,6 +223,20 @@ export default function App() {
               </div>
             )}
 
+            {isLive && (
+              <div style={styles.cameraBar}>
+                <button className="kn-btn" style={styles.flipBtn} onClick={handleFlipCamera} aria-label="カメラ切り替え">
+                  <SwitchCamera size={22} color="#fff" />
+                </button>
+                <button className="kn-btn" style={styles.shutterBtn} onClick={handleCapture} aria-label="撮影">
+                  <span style={styles.shutterInner} />
+                </button>
+                <button className="kn-btn" style={styles.flipBtn} onClick={handleClose} aria-label="終了">
+                  <X size={22} color="#fff" />
+                </button>
+              </div>
+            )}
+
             {/* 角のかわいいフレーム装飾 */}
             <span style={{ ...styles.corner, ...styles.cornerTL, borderColor: spec.color }} />
             <span style={{ ...styles.corner, ...styles.cornerTR, borderColor: spec.color }} />
@@ -270,17 +303,9 @@ export default function App() {
         )}
 
         {viewState === "live" && (
-          <>
-            <button className="kn-btn" style={styles.primaryBtn} onClick={handleCapture}>
-              <Aperture size={18} /> 撮影する
-            </button>
-            <button className="kn-btn" style={styles.secondaryBtn} onClick={handleUploadClick}>
-              <Upload size={18} /> 写真を選ぶ
-            </button>
-            <button className="kn-btn" style={styles.ghostBtn} onClick={handleClose}>
-              <X size={18} /> 終了
-            </button>
-          </>
+          <button className="kn-btn" style={styles.ghostBtn} onClick={handleUploadClick}>
+            <Upload size={18} /> 写真を選ぶ
+          </button>
         )}
 
         {hasStatic && (
@@ -391,6 +416,50 @@ const styles = {
     boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
   },
   liveDot: { width: 8, height: 8, borderRadius: "50%", display: "inline-block" },
+
+  cameraBar: {
+    position: "absolute",
+    bottom: 14,
+    left: 0,
+    right: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 28,
+    zIndex: 2,
+  },
+  shutterBtn: {
+    width: 68,
+    height: 68,
+    borderRadius: "50%",
+    border: "4px solid rgba(255,255,255,0.95)",
+    background: "rgba(255,255,255,0.25)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    padding: 0,
+  },
+  shutterInner: {
+    width: 52,
+    height: 52,
+    borderRadius: "50%",
+    background: "#fff",
+    display: "block",
+  },
+  flipBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: "50%",
+    border: "none",
+    background: "rgba(30,30,30,0.45)",
+    backdropFilter: "blur(6px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    padding: 0,
+  },
 
   corner: {
     position: "absolute",
