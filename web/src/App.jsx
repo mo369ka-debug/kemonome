@@ -30,7 +30,6 @@ export default function App() {
   const [cameraError, setCameraError] = useState(null);
   const [facing, setFacing] = useState("environment"); // environment=外カメ / user=インカメ
   const [blurOn, setBlurOn] = useState(true);   // 視力ぼかし ON/OFF
-  const [senior, setSenior] = useState(false);  // シニア(視力低下)モード
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -38,23 +37,21 @@ export default function App() {
   const rafRef = useRef(null);
   const modeRef = useRef(mode);
   const facingRef = useRef("environment");
-  const blurRef = useRef({ on: true, senior: false });
+  const blurRef = useRef(true);
   const uploadedImgRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const currentBlurPx = () => {
-    const { on, senior: sr } = blurRef.current;
-    if (!on) return 0;
-    const base = SPECIES[modeRef.current].acuityBlurPx || 0;
-    return base * (sr ? 2.5 : 1);
+    if (!blurRef.current) return 0;
+    return SPECIES[modeRef.current].acuityBlurPx || 0;
   };
 
   useEffect(() => {
     modeRef.current = mode;
-    blurRef.current = { on: blurOn, senior };
+    blurRef.current = blurOn;
     if (viewState === "captured" || viewState === "photo") redrawStatic();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, blurOn, senior]);
+  }, [mode, blurOn]);
 
   const redrawStatic = useCallback(() => {
     const canvas = canvasRef.current;
@@ -300,21 +297,19 @@ export default function App() {
             color: blurOn ? "#fff" : "#93A08E",
           }}
         >
-          👁 視力ぼかし {blurOn ? "ON" : "OFF"}
+          <span style={{
+            width: 34, height: 20, borderRadius: 999, position: "relative",
+            background: blurOn ? "#8FA88B" : "#E3E8E0", transition: "background .15s ease",
+            display: "inline-block", flexShrink: 0,
+          }}>
+            <span style={{
+              position: "absolute", top: 2, left: blurOn ? 16 : 2,
+              width: 16, height: 16, borderRadius: "50%", background: "#fff",
+              transition: "left .15s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+            }} />
+          </span>
+          視力のぼやけ{blurOn ? "あり" : "なし"}
         </button>
-        {blurOn && mode !== "human" && (
-          <button
-            className="kn-btn"
-            onClick={() => setSenior(v => !v)}
-            style={{
-              ...styles.blurToggle,
-              background: senior ? "#8C7B5C" : "#fff",
-              color: senior ? "#fff" : "#93A08E",
-            }}
-          >
-            {senior ? "🐾 シニアの目" : "🐾 わかい目"}
-          </button>
-        )}
       </div>
 
       <div style={{ ...styles.dataCard, background: `${spec.color}18`, borderColor: `${spec.color}55` }}>
