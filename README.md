@@ -1,38 +1,54 @@
-# けものめ 精度強化パッチ
+# けものめ (kemonome)
 
-## 中身
+犬・猫が見ている世界を、カメラ越しに体験できるアプリ。
+
+## 構成
 
 ```
-shared/species.js        ← 丸ごと差し替え(安全)
-shared/visionEngine.js   ← 丸ごと差し替え(安全)
-web/src/useAcuityBlur.js ← 新規追加(ぼかしトグルのロジック)
-web/src/BlurControls.jsx ← 新規追加(ぼかしトグルのUI)
+kemonome/
+├── shared/              ← DOM非依存の「純粋なロジック」。Web版・将来のネイティブ版で共有する
+│   ├── species.js        ヒト/イヌ/ネコの視覚データ(色変換マトリクス・視力・視野など)
+│   └── visionEngine.js    マトリクス適用・tint(色味の足し込み)などの計算処理
+│
+└── web/                 ← 今回のWeb版(Vite + React)
+    ├── index.html
+    └── src/
+        ├── main.jsx
+        └── App.jsx        カメラ/アップロードUI。shared/ のロジックを呼び出すだけ
 ```
 
-## 手順
+**設計方針**: `shared/` には Canvas も React Native も知らない「動物種ごとの数値データと計算式」だけを置いている。
+UI(カメラ制御・ボタン・レイアウト)は `web/` 側の関心事として分離した。
+これにより、将来 React Native 版を作る際も `shared/species.js` の色変換マトリクスや視覚データは**そのまま使い回せる**。
 
-1. `shared/species.js` と `shared/visionEngine.js` を **そのまま上書き**。
-   - `applyColorVision(imageData, speciesId)` という呼び出しシグネチャは前と同じなので、呼び出し側は基本いじらなくてOK。
+## Web版の動かし方
 
-2. `web/src/useAcuityBlur.js` と `web/src/BlurControls.jsx` を追加。
-   - `import { SPECIES } from '../../shared/species.js'` のパスだけ、実際の構成に合わせて直す。
+```bash
+cd web
+npm install
+npm run dev
+```
 
-3. カメラを描画しているコンポーネントで:
-   ```jsx
-   import { useAcuityBlur } from './useAcuityBlur.js';
-   import { BlurControls } from './BlurControls.jsx';
+## デプロイ(プレリリース)
 
-   const blur = useAcuityBlur(speciesId);
+Vercel や Netlify に `web/` ディレクトリをルートとして接続すればそのまま公開できる。
+カメラ・写真処理はすべて端末内(ブラウザ)で完結し、画像データはサーバーに送信されない。
 
-   <canvas ref={canvasRef} style={blur.canvasStyle} />
-   <BlurControls blur={blur} />
-   ```
+## 将来: iOS/Android ネイティブ版について
 
-## 注意
+Web版で手応えが確認できたら、React Native (Expo) + `@shopify/react-native-skia` での実装を想定している。
 
-- CSS ぼかしは「表示」だけにかかる。写真保存/録画には焼き込まれない。
-  保存にも反映したいなら canvas 側で別途ぼかす処理が必要(その分重くなる)。
-- ぼかし量(px)は端末・表示サイズ依存。実機を見ながら species.js の
-  `acuityBlurPx` を微調整する。
-- 速度をさらに稼ぎたいときは、処理用 canvas を長辺 480〜640px に縮小してから
-  applyColorVision → 表示側で拡大、が一番効く。
+- `shared/species.js` の `matrix` (3x3配列) は `toSkiaColorMatrix()` で
+  Skia の ColorMatrix形式(4x5)に変換して、そのまま `Skia.ColorFilter.MakeMatrix()` に渡せる設計にしてある。
+- リアルタイムのカメラ処理には `expo-camera` 単体では画素データへのアクセスができないため、
+  `react-native-vision-camera` の Frame Processor + Skia を組み合わせる方式が現実的。
+- そのため着手時は次のような構成を想定:
+
+```
+kemonome/
+├── shared/        ← 変更なし、そのまま流用
+├── web/           ← 変更なし
+└── native/        ← 新規追加 (Expo + Skia)
+```
+
+この設計に沿って `shared/` を汚さずに `native/` を追加できるようにしておくこと。
