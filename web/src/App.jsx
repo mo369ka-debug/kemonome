@@ -365,6 +365,16 @@ export default function App() {
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} />
       </div>
 
+      <a
+        className="kn-btn"
+        href="https://buymeacoffee.com/kemonome"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={styles.supportBtn}
+      >
+        ☕ 開発を応援する
+      </a>
+
       <p style={styles.footnote}>
         本アプリは犬・猫の色覚（二色型）・視力・視野・暗所視能力といった生物学的特徴を、
         教育目的で視覚的に近似した演出です。実際の網膜知覚を厳密に再現するものではありません。
@@ -634,6 +644,20 @@ const styles = {
     cursor: "pointer",
   },
 
+  supportBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "11px 22px",
+    borderRadius: 999,
+    background: "#FFDD00",
+    color: "#3D3000",
+    fontWeight: 700,
+    fontSize: 14,
+    textDecoration: "none",
+    boxShadow: "0 3px 12px rgba(255,221,0,0.4)",
+    marginBottom: 20,
+  },
   footnote: {
     maxWidth: 400,
     textAlign: "center",
