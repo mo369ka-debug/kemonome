@@ -85,7 +85,9 @@ export default function App() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  const startCamera = async (facingMode = facing) => {
+  const startCamera = async (facingMode) => {
+    // onClickから直接呼ばれた場合などイベントが渡っても壊れないように防御
+    if (typeof facingMode !== "string") facingMode = facingRef.current;
     setCameraError(null);
     uploadedImgRef.current = null;
     stopCamera();
@@ -293,7 +295,7 @@ export default function App() {
       <div style={styles.controls}>
         {viewState === "idle" && (
           <>
-            <button className="kn-btn" style={styles.primaryBtn} onClick={startCamera}>
+            <button className="kn-btn" style={styles.primaryBtn} onClick={() => startCamera()}>
               <Camera size={18} /> カメラを起動
             </button>
             <button className="kn-btn" style={styles.secondaryBtn} onClick={handleUploadClick}>
