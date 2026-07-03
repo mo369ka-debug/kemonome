@@ -7,8 +7,8 @@ import { applyVisionToCanvas } from "../../shared/visionEngine.js";
 const CANVAS_W = 480;
 const CANVAS_H = 640; // 3:4 (縦持ちスマホ向け)
 
-function applyVision(ctx, source, sw, sh, speciesKey) {
-  applyVisionToCanvas(ctx, source, sw, sh, CANVAS_W, CANVAS_H, SPECIES[speciesKey]);
+function applyVision(ctx, source, sw, sh, speciesKey, blurPx = 0) {
+  applyVisionToCanvas(ctx, source, sw, sh, CANVAS_W, CANVAS_H, SPECIES[speciesKey], blurPx);
 }
 
 function PupilIcon({ shape, color, size = 22 }) {
@@ -29,6 +29,8 @@ export default function App() {
   const [viewState, setViewState] = useState("idle");
   const [cameraError, setCameraError] = useState(null);
   const [facing, setFacing] = useState("environment"); // environment=外カメ / user=インカメ
+  const [blurOn, setBlurOn] = useState(true);   // 視力ぼかし ON/OFF
+  const [senior, setSenior] = useState(false);  // シニア(視力低下)モード
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -36,14 +38,23 @@ export default function App() {
   const rafRef = useRef(null);
   const modeRef = useRef(mode);
   const facingRef = useRef("environment");
+  const blurRef = useRef({ on: true, senior: false });
   const uploadedImgRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  const currentBlurPx = () => {
+    const { on, senior: sr } = blurRef.current;
+    if (!on) return 0;
+    const base = SPECIES[modeRef.current].acuityBlurPx || 0;
+    return base * (sr ? 2.5 : 1);
+  };
+
   useEffect(() => {
     modeRef.current = mode;
+    blurRef.current = { on: blurOn, senior };
     if (viewState === "captured" || viewState === "photo") redrawStatic();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, blurOn, senior]);
 
   const redrawStatic = useCallback(() => {
     const canvas = canvasRef.current;
@@ -51,7 +62,7 @@ export default function App() {
     const ctx = canvas.getContext("2d");
     if (viewState === "photo" && uploadedImgRef.current) {
       const img = uploadedImgRef.current;
-      applyVision(ctx, img, img.naturalWidth, img.naturalHeight, modeRef.current);
+      applyVision(ctx, img, img.naturalWidth, img.naturalHeight, modeRef.current, currentBlurPx());
     }
   }, [viewState]);
 
@@ -65,10 +76,10 @@ export default function App() {
         ctx.save();
         ctx.translate(CANVAS_W, 0);
         ctx.scale(-1, 1);
-        applyVision(ctx, video, video.videoWidth, video.videoHeight, modeRef.current);
+        applyVision(ctx, video, video.videoWidth, video.videoHeight, modeRef.current, currentBlurPx());
         ctx.restore();
       } else {
-        applyVision(ctx, video, video.videoWidth, video.videoHeight, modeRef.current);
+        applyVision(ctx, video, video.videoWidth, video.videoHeight, modeRef.current, currentBlurPx());
       }
     }
     rafRef.current = requestAnimationFrame(drawLoop);
@@ -150,7 +161,7 @@ export default function App() {
         setTimeout(() => {
           const canvas = canvasRef.current;
           const ctx = canvas.getContext("2d");
-          applyVision(ctx, img, img.naturalWidth, img.naturalHeight, modeRef.current);
+          applyVision(ctx, img, img.naturalWidth, img.naturalHeight, modeRef.current, currentBlurPx());
         }, 0);
       };
       img.src = ev.target.result;
@@ -277,6 +288,33 @@ export default function App() {
             </button>
           );
         })}
+      </div>
+
+      <div style={styles.blurRow}>
+        <button
+          className="kn-btn"
+          onClick={() => setBlurOn(v => !v)}
+          style={{
+            ...styles.blurToggle,
+            background: blurOn ? "#5C6858" : "#fff",
+            color: blurOn ? "#fff" : "#93A08E",
+          }}
+        >
+          👁 視力ぼかし {blurOn ? "ON" : "OFF"}
+        </button>
+        {blurOn && mode !== "human" && (
+          <button
+            className="kn-btn"
+            onClick={() => setSenior(v => !v)}
+            style={{
+              ...styles.blurToggle,
+              background: senior ? "#8C7B5C" : "#fff",
+              color: senior ? "#fff" : "#93A08E",
+            }}
+          >
+            {senior ? "🐾 シニアの目" : "🐾 わかい目"}
+          </button>
+        )}
       </div>
 
       <div style={{ ...styles.dataCard, background: `${spec.color}18`, borderColor: `${spec.color}55` }}>
@@ -492,7 +530,20 @@ const styles = {
     boxShadow: "0 2px 8px rgba(168,90,56,0.08)",
   },
 
-  speciesRow: { display: "flex", gap: 8, marginBottom: 18 },
+  speciesRow: { display: "flex", gap: 8, marginBottom: 12 },
+  blurRow: { display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", justifyContent: "center" },
+  blurToggle: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "8px 16px",
+    borderRadius: 999,
+    border: "none",
+    cursor: "pointer",
+    fontSize: 13.5,
+    fontWeight: 600,
+    boxShadow: "0 2px 8px rgba(46,58,43,0.10)",
+  },
   speciesBtn: {
     display: "flex",
     alignItems: "center",
