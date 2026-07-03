@@ -1,74 +1,29 @@
-/**
- * shared/species.js
- *
- * 犬・猫・人の視覚データ。DOMやReactに依存しない「純粋なJS」なので、
- * Web版(Canvas)でもネイティブ版(React Native + Skia)でもそのまま import して使える。
- *
- * ※ 実際の網膜知覚を厳密に再現するものではなく、二色型色覚・視力低下・
- *   広い視野・低照度感度といった実在の生物学的特徴を、教育目的で
- *   視覚的に近似したシミュレーションです。
- */
+// shared/species.js
+// 各動物種の色覚モデル。
+// matrix は「線形sRGB空間」で使う二色型シミュレーション行列。
+// 出典の考え方: Machado, Oliveira & Fernandes (2009) の二色覚シミュレーション行列。
+// 犬・猫は M 錐体を欠く二色型で、人間の第2色覚(deuteranopia)が最も近いモデル。
+// ※ 犬猫「専用」の検証済み行列は学術的に確立されていないため、これは筋の通った近似です。
+
+const DEUTAN = [
+  0.367322, 0.860646, -0.227968,
+  0.280085, 0.672501,  0.047413,
+ -0.011820, 0.042940,  0.968881,
+];
 
 export const SPECIES = {
-  human: {
-    label: "ヒト",
-    en: "HUMAN",
-    emoji: "🧑",
-    color: "#5B9BD5",
-    glow: "rgba(91,155,213,0.4)",
-    pupil: "round",
-    // Web(Canvas)用: ctx.filter に渡す文字列
-    cssFilter: "none",
-    // 色変換用の 3x3 マトリクス。null = 変換なし
-    matrix: null,
-    // 変換後にどれだけ輝度方向へ寄せるか (0=そのまま, 1=完全グレー)
-    desaturate: 0,
-    tint: null,
-    data: {
-      acuity: "1.0（基準）",
-      color: "三色型 — フルカラーを知覚",
-      fov: "約180°",
-      note: "解像度・色彩認識ともに最も高い",
-    },
-  },
   dog: {
-    label: "イヌ",
-    en: "DOG",
-    emoji: "🐶",
-    color: "#C77B3B",
-    glow: "rgba(199,123,59,0.45)",
-    pupil: "round",
-    cssFilter: "contrast(1.05) brightness(1.08) blur(1px)",
-    // 赤と緑をほぼ同一視し、黄〜琥珀色に強く寄せる
-    matrix: [0.5, 0.5, 0, 0.5, 0.5, 0, 0.1, 0.1, 0.8],
-    desaturate: 0.35,
-    tint: { rgb: [203, 161, 53], strength: 0.4 },
-    data: {
-      acuity: "0.3前後（ヒトの20/75相当）",
-      color: "二色型 — 赤と緑の識別が苦手。青と黄を中心に知覚",
-      fov: "約240〜250°（広い周辺視野）",
-      note: "動体視力に優れ、薄暮でもよく見える",
-    },
+    id: 'dog',
+    label: '犬',
+    matrix: DEUTAN,
+    chroma: 1.0,        // 色の残し具合(1 = 行列そのまま)
+    acuityBlurPx: 2.0,  // 視力ぼかしの基準量(犬 ≒ 20/75)
   },
   cat: {
-    label: "ネコ",
-    en: "CAT",
-    emoji: "🐱",
-    color: "#8FB93E",
-    glow: "rgba(143,185,62,0.45)",
-    pupil: "slit",
-    cssFilter: "contrast(0.96) brightness(1.18) blur(1.3px)",
-    // 赤と緑をゆるやかに混ぜつつ、青もある程度残す(強く青に寄せすぎない)
-    matrix: [0.62, 0.38, 0, 0.38, 0.62, 0, 0.08, 0.17, 0.75],
-    desaturate: 0.32,
-    tint: { rgb: [214, 196, 96], strength: 0.22 },
-    data: {
-      acuity: "0.1〜0.2前後（ヒトの20/100〜20/200相当）",
-      color: "二色型 — 赤の識別が弱く、青・黄が中心（黄緑寄り）",
-      fov: "約200°",
-      note: "タペタム（輝板）により暗所視能力が非常に高い",
-    },
+    id: 'cat',
+    label: '猫',
+    matrix: DEUTAN,
+    chroma: 0.75,       // 猫は色識別が弱いとされるので彩度を少し落とす
+    acuityBlurPx: 3.5,  // 視力ぼかしの基準量(猫 ≒ 20/100〜150)
   },
 };
-
-export const SPECIES_KEYS = Object.keys(SPECIES);
