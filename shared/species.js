@@ -13,8 +13,9 @@ export const SPECIES = {
   human: {
     label: "ヒト",
     en: "HUMAN",
-    color: "#ECE6D6",
-    glow: "rgba(236,230,214,0.35)",
+    emoji: "🧑",
+    color: "#5B9BD5",
+    glow: "rgba(91,155,213,0.4)",
     pupil: "round",
     // Web(Canvas)用: ctx.filter に渡す文字列
     cssFilter: "none",
@@ -33,8 +34,9 @@ export const SPECIES = {
   dog: {
     label: "イヌ",
     en: "DOG",
-    color: "#CBA135",
-    glow: "rgba(203,161,53,0.45)",
+    emoji: "🐶",
+    color: "#C77B3B",
+    glow: "rgba(199,123,59,0.45)",
     pupil: "round",
     cssFilter: "contrast(1.05) brightness(1.08) blur(1px)",
     // 赤と緑をほぼ同一視し、黄〜琥珀色に強く寄せる
@@ -51,17 +53,18 @@ export const SPECIES = {
   cat: {
     label: "ネコ",
     en: "CAT",
-    color: "#6FB89A",
-    glow: "rgba(111,184,154,0.45)",
+    emoji: "🐱",
+    color: "#8FB93E",
+    glow: "rgba(143,185,62,0.45)",
     pupil: "slit",
-    cssFilter: "contrast(0.9) brightness(1.4) blur(2px)",
-    // 赤緑の分離をほぼ消し、青緑〜灰色寄りの世界にする
-    matrix: [0.35, 0.35, 0, 0.35, 0.35, 0, 0, 0.35, 0.9],
-    desaturate: 0.6,
-    tint: { rgb: [111, 184, 154], strength: 0.4 },
+    cssFilter: "contrast(0.96) brightness(1.18) blur(1.3px)",
+    // 赤と緑をゆるやかに混ぜつつ、青もある程度残す(強く青に寄せすぎない)
+    matrix: [0.62, 0.38, 0, 0.38, 0.62, 0, 0.08, 0.17, 0.75],
+    desaturate: 0.32,
+    tint: { rgb: [214, 196, 96], strength: 0.22 },
     data: {
       acuity: "0.1〜0.2前後（ヒトの20/100〜20/200相当）",
-      color: "二色型 — 赤の識別が弱く、青・黄が中心",
+      color: "二色型 — 赤の識別が弱く、青・黄が中心（黄緑寄り）",
       fov: "約200°",
       note: "タペタム（輝板）により暗所視能力が非常に高い",
     },

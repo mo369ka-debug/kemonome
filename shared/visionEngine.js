@@ -76,10 +76,17 @@ export function drawCover(ctx, source, sw, sh, dw, dh) {
 }
 
 /**
- * 輝度ベースの「色味の足し込み」。
+ * 輝度を保ったまま色味だけを混ぜる「色相/彩度だけ置き換え」処理。
+ * (Photoshopの「カラー」ブレンドモード相当を数値計算で再現)
+ *
+ * 前バージョンは単純に lum * tintColor を混ぜていたため、tint色自体の
+ * 明るさ(203や184など255未満)に引っ張られて全体が暗く見える不具合があった。
+ * tint色の輝度を測り、元画素の輝度に合わせてスケーリングすることで、
+ * 明るさを変えずに色味だけを足し込む。
+ *
  * globalCompositeOperation のようなCanvas固有のブレンドAPIに頼らず、
  * 純粋な数値計算だけで実装しているため、将来Skia側でも同じ結果を
- * 再現できる(ColorMatrixのlerpとして書き直すだけでよい)。
+ * 再現できる。
  *
  * @param {ImageData} imageData
  * @param {[number,number,number]} rgb - 足し込みたい色 (0-255)
@@ -89,11 +96,18 @@ export function applyTint(imageData, rgb, strength = 0) {
   if (!strength) return imageData;
   const d = imageData.data;
   const [tr, tg, tb] = rgb;
+  // tint色そのものの輝度(これが小さいほど暗く引っ張られやすい)
+  const tintLum = 0.299 * tr + 0.587 * tg + 0.114 * tb || 1;
   for (let i = 0; i < d.length; i += 4) {
-    const lum = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
-    d[i] = d[i] + (lum * tr - d[i]) * strength;
-    d[i + 1] = d[i + 1] + (lum * tg - d[i + 1]) * strength;
-    d[i + 2] = d[i + 2] + (lum * tb - d[i + 2]) * strength;
+    const srcLum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    // 元画素と同じ明るさになるようtint色をスケーリング
+    const scale = srcLum / tintLum;
+    const tintedR = tr * scale;
+    const tintedG = tg * scale;
+    const tintedB = tb * scale;
+    d[i] = d[i] + (tintedR - d[i]) * strength;
+    d[i + 1] = d[i + 1] + (tintedG - d[i + 1]) * strength;
+    d[i + 2] = d[i + 2] + (tintedB - d[i + 2]) * strength;
   }
   return imageData;
 }
@@ -102,14 +116,14 @@ export function applyTint(imageData, rgb, strength = 0) {
  * Web版のメイン処理: source(video/image)を canvas に描画し、
  * 指定した動物種の視覚マトリクスを適用する。
  */
-export function applyVisionToCanvas(ctx, source, sw, sh, canvasSize, spec) {
+export function applyVisionToCanvas(ctx, source, sw, sh, canvasW, canvasH, spec) {
   ctx.save();
   ctx.filter = spec.cssFilter;
-  drawCover(ctx, source, sw, sh, canvasSize, canvasSize);
+  drawCover(ctx, source, sw, sh, canvasW, canvasH);
   ctx.restore();
 
   if (spec.matrix) {
-    const imgData = ctx.getImageData(0, 0, canvasSize, canvasSize);
+    const imgData = ctx.getImageData(0, 0, canvasW, canvasH);
     applyColorMatrixToImageData(imgData, spec.matrix, spec.desaturate || 0);
     if (spec.tint) applyTint(imgData, spec.tint.rgb, spec.tint.strength);
     ctx.putImageData(imgData, 0, 0);
