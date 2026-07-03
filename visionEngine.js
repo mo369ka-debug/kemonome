@@ -116,14 +116,14 @@ export function applyTint(imageData, rgb, strength = 0) {
  * Web版のメイン処理: source(video/image)を canvas に描画し、
  * 指定した動物種の視覚マトリクスを適用する。
  */
-export function applyVisionToCanvas(ctx, source, sw, sh, canvasSize, spec) {
+export function applyVisionToCanvas(ctx, source, sw, sh, canvasW, canvasH, spec) {
   ctx.save();
   ctx.filter = spec.cssFilter;
-  drawCover(ctx, source, sw, sh, canvasSize, canvasSize);
+  drawCover(ctx, source, sw, sh, canvasW, canvasH);
   ctx.restore();
 
   if (spec.matrix) {
-    const imgData = ctx.getImageData(0, 0, canvasSize, canvasSize);
+    const imgData = ctx.getImageData(0, 0, canvasW, canvasH);
     applyColorMatrixToImageData(imgData, spec.matrix, spec.desaturate || 0);
     if (spec.tint) applyTint(imgData, spec.tint.rgb, spec.tint.strength);
     ctx.putImageData(imgData, 0, 0);

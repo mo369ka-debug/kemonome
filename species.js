@@ -13,8 +13,9 @@ export const SPECIES = {
   human: {
     label: "ヒト",
     en: "HUMAN",
-    color: "#ECE6D6",
-    glow: "rgba(236,230,214,0.35)",
+    emoji: "🧑",
+    color: "#5B9BD5",
+    glow: "rgba(91,155,213,0.4)",
     pupil: "round",
     // Web(Canvas)用: ctx.filter に渡す文字列
     cssFilter: "none",
@@ -33,8 +34,9 @@ export const SPECIES = {
   dog: {
     label: "イヌ",
     en: "DOG",
-    color: "#CBA135",
-    glow: "rgba(203,161,53,0.45)",
+    emoji: "🐶",
+    color: "#C77B3B",
+    glow: "rgba(199,123,59,0.45)",
     pupil: "round",
     cssFilter: "contrast(1.05) brightness(1.08) blur(1px)",
     // 赤と緑をほぼ同一視し、黄〜琥珀色に強く寄せる
@@ -51,8 +53,9 @@ export const SPECIES = {
   cat: {
     label: "ネコ",
     en: "CAT",
-    color: "#B7C25C",
-    glow: "rgba(183,194,92,0.4)",
+    emoji: "🐱",
+    color: "#8FB93E",
+    glow: "rgba(143,185,62,0.45)",
     pupil: "slit",
     cssFilter: "contrast(0.96) brightness(1.18) blur(1.3px)",
     // 赤と緑をゆるやかに混ぜつつ、青もある程度残す(強く青に寄せすぎない)
