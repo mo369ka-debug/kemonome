@@ -1,9 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Camera, Upload, Download, RotateCcw, X, AlertCircle, Aperture } from "lucide-react";
+
 import { SPECIES } from "../../shared/species.js";
 import { applyVisionToCanvas } from "../../shared/visionEngine.js";
 
-const CANVAS_SIZE = 480;
+const CANVAS_W = 480;
+const CANVAS_H = 640; // 3:4 (縦持ちスマホ向け)
+
+function applyVision(ctx, source, sw, sh, speciesKey) {
+  applyVisionToCanvas(ctx, source, sw, sh, CANVAS_W, CANVAS_H, SPECIES[speciesKey]);
+}
 
 function PupilIcon({ shape, color, size = 22 }) {
   return (
@@ -19,8 +25,8 @@ function PupilIcon({ shape, color, size = 22 }) {
 }
 
 export default function App() {
-  const [mode, setMode] = useState("human");
-  const [viewState, setViewState] = useState("idle"); // idle | live | captured | photo
+  const [mode, setMode] = useState("cat");
+  const [viewState, setViewState] = useState("idle");
   const [cameraError, setCameraError] = useState(null);
 
   const videoRef = useRef(null);
@@ -43,7 +49,7 @@ export default function App() {
     const ctx = canvas.getContext("2d");
     if (viewState === "photo" && uploadedImgRef.current) {
       const img = uploadedImgRef.current;
-      applyVisionToCanvas(ctx, img, img.naturalWidth, img.naturalHeight, CANVAS_SIZE, SPECIES[modeRef.current]);
+      applyVision(ctx, img, img.naturalWidth, img.naturalHeight, modeRef.current);
     }
   }, [viewState]);
 
@@ -52,7 +58,7 @@ export default function App() {
     const canvas = canvasRef.current;
     if (video && canvas && video.videoWidth > 0) {
       const ctx = canvas.getContext("2d");
-      applyVisionToCanvas(ctx, video, video.videoWidth, video.videoHeight, CANVAS_SIZE, SPECIES[modeRef.current]);
+      applyVision(ctx, video, video.videoWidth, video.videoHeight, modeRef.current);
     }
     rafRef.current = requestAnimationFrame(drawLoop);
   }, []);
@@ -84,7 +90,7 @@ export default function App() {
       rafRef.current = requestAnimationFrame(drawLoop);
     } catch (err) {
       setCameraError(
-        "カメラにアクセスできませんでした。ブラウザの権限設定をご確認いただくか、下の「写真をアップロード」からお試しください。"
+        "カメラにアクセスできませんでした。写真をアップロードして色味を確認してください。"
       );
     }
   };
@@ -123,7 +129,7 @@ export default function App() {
         setTimeout(() => {
           const canvas = canvasRef.current;
           const ctx = canvas.getContext("2d");
-          applyVisionToCanvas(ctx, img, img.naturalWidth, img.naturalHeight, CANVAS_SIZE, SPECIES[modeRef.current]);
+          applyVision(ctx, img, img.naturalWidth, img.naturalHeight, modeRef.current);
         }, 0);
       };
       img.src = ev.target.result;
@@ -153,55 +159,57 @@ export default function App() {
   return (
     <div style={styles.page}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; }
         body { margin: 0; }
-        .kn-btn { transition: transform .15s ease, border-color .15s ease, background .15s ease; }
-        .kn-btn:active { transform: scale(0.96); }
-        .kn-tick { position:absolute; left:50%; top:50%; width:1px; height:8px; background:rgba(236,230,214,0.22); transform-origin:0 ${CANVAS_SIZE / 2 + 18}px; }
-        @keyframes kn-pulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
-        .kn-live-dot { animation: kn-pulse 1.6s ease-in-out infinite; }
+        .kn-btn { transition: transform .12s ease, box-shadow .15s ease, background .15s ease; }
+        .kn-btn:active { transform: scale(0.94) translateY(1px); }
+        @keyframes kn-pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+        .kn-live-dot { animation: kn-pulse 1.4s ease-in-out infinite; }
+        @keyframes kn-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        .kn-bob { animation: kn-bob 2.4s ease-in-out infinite; }
         input[type=file] { display:none; }
       `}</style>
 
       <div style={styles.header}>
-        <div style={styles.eyebrow}>ANIMAL VISION LAB</div>
         <h1 style={styles.title}>けものめ</h1>
-        <p style={styles.subtitle}>犬・猫が見ている世界を、カメラ越しに覗いてみる。</p>
+        <p style={styles.subtitle}>いぬ・ねこには世界がこう見えてる！</p>
       </div>
 
       <div style={styles.stageWrap}>
-        <div style={{ ...styles.ring, boxShadow: `0 0 0 1px rgba(236,230,214,0.1), 0 0 40px ${spec.glow}` }}>
-          {Array.from({ length: 24 }).map((_, i) => (
-            <div key={i} className="kn-tick" style={{ transform: `rotate(${i * 15}deg)` }} />
-          ))}
-          <div style={styles.circleMask}>
+        <div style={{ ...styles.finder, borderColor: spec.color, boxShadow: `0 12px 30px -8px ${spec.glow}` }}>
+          <div style={styles.finderInner}>
             <video ref={videoRef} muted playsInline style={{ display: "none" }} />
             <canvas
               ref={canvasRef}
-              width={CANVAS_SIZE}
-              height={CANVAS_SIZE}
+              width={CANVAS_W}
+              height={CANVAS_H}
               style={{
                 width: "100%",
                 height: "100%",
                 display: hasContent ? "block" : "none",
-                borderRadius: "50%",
+                objectFit: "cover",
               }}
             />
             {!hasContent && (
               <div style={styles.placeholder}>
-                <Aperture size={40} strokeWidth={1.2} color="rgba(236,230,214,0.35)" />
-                <span style={styles.placeholderText}>カメラを起動するか{"\n"}写真を選んでください</span>
+                <div className="kn-bob" style={{ fontSize: 44 }}>{spec.emoji}</div>
+                <span style={styles.placeholderText}>カメラをスタートするか{"\n"}写真を選んでね</span>
               </div>
             )}
-          </div>
 
-          {isLive && (
-            <div style={styles.liveBadge}>
-              <span className="kn-live-dot" style={{ ...styles.liveDot, background: spec.color }} />
-              LIVE — {spec.en}
-            </div>
-          )}
+            {isLive && (
+              <div style={styles.liveBadge}>
+                <span className="kn-live-dot" style={{ ...styles.liveDot, background: spec.color }} />
+                {spec.label}の目
+              </div>
+            )}
+
+            {/* 角のかわいいフレーム装飾 */}
+            <span style={{ ...styles.corner, ...styles.cornerTL, borderColor: spec.color }} />
+            <span style={{ ...styles.corner, ...styles.cornerTR, borderColor: spec.color }} />
+            <span style={{ ...styles.corner, ...styles.cornerBL, borderColor: spec.color }} />
+            <span style={{ ...styles.corner, ...styles.cornerBR, borderColor: spec.color }} />
+          </div>
         </div>
       </div>
 
@@ -222,12 +230,13 @@ export default function App() {
               onClick={() => setMode(key)}
               style={{
                 ...styles.speciesBtn,
-                borderColor: active ? s.color : "rgba(236,230,214,0.16)",
-                background: active ? "rgba(236,230,214,0.06)" : "transparent",
+                borderColor: s.color,
+                background: active ? s.color : "#fff",
+                boxShadow: active ? `0 4px 0 ${s.glow}` : "0 2px 4px rgba(90,70,50,0.1)",
               }}
             >
-              <PupilIcon shape={s.pupil} color={active ? s.color : "rgba(236,230,214,0.4)"} />
-              <span style={{ color: active ? s.color : "rgba(236,230,214,0.55)", fontWeight: 600 }}>
+              <PupilIcon shape={s.pupil} color={active ? "#fff" : s.color} />
+              <span style={{ color: active ? "#fff" : s.color, fontWeight: 700 }}>
                 {s.label}
               </span>
             </button>
@@ -235,23 +244,17 @@ export default function App() {
         })}
       </div>
 
-      <div style={{ ...styles.dataCard, borderColor: `${spec.color}55` }}>
-        <div style={styles.dataRow}>
-          <span style={styles.dataLabel}>視力</span>
-          <span style={styles.dataValue}>{spec.data.acuity}</span>
+      <div style={{ ...styles.dataCard, background: `${spec.color}18`, borderColor: `${spec.color}55` }}>
+        <div style={styles.dataTitle}>
+          <span style={{ fontSize: 18 }}>{spec.emoji}</span>
+          {spec.label}にはこう見えてる
         </div>
-        <div style={styles.dataRow}>
-          <span style={styles.dataLabel}>色覚</span>
-          <span style={styles.dataValue}>{spec.data.color}</span>
+        <p style={styles.dataDesc}>{spec.data.color}</p>
+        <div style={styles.chipRow}>
+          <span style={styles.chip}>👁 視力 {spec.data.acuity}</span>
+          <span style={styles.chip}>📐 視野 {spec.data.fov}</span>
         </div>
-        <div style={styles.dataRow}>
-          <span style={styles.dataLabel}>視野</span>
-          <span style={styles.dataValue}>{spec.data.fov}</span>
-        </div>
-        <div style={styles.dataRow}>
-          <span style={styles.dataLabel}>特徴</span>
-          <span style={styles.dataValue}>{spec.data.note}</span>
-        </div>
+        <p style={styles.dataNote}>{spec.data.note}</p>
       </div>
 
       <div style={styles.controls}>
@@ -310,54 +313,48 @@ export default function App() {
     </div>
   );
 }
+const SYS = "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif";
 
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "radial-gradient(ellipse at 50% -10%, #1b221a 0%, #10160f 55%, #0c100b 100%)",
-    color: "#ECE6D6",
-    fontFamily: "'Inter', sans-serif",
-    padding: "40px 20px 56px",
+    background: "#F6F8F4",
+    color: "#3D4A3A",
+    fontFamily: SYS,
+    padding: "32px 16px 48px",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
   },
-  header: { textAlign: "center", maxWidth: 480, marginBottom: 28 },
-  eyebrow: {
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 11,
-    letterSpacing: "0.22em",
-    color: "#6FB89A",
-    marginBottom: 10,
-  },
+  header: { textAlign: "center", maxWidth: 480, marginBottom: 22 },
   title: {
-    fontFamily: "'Fraunces', serif",
-    fontStyle: "italic",
-    fontWeight: 600,
-    fontSize: "clamp(34px, 8vw, 48px)",
+    fontFamily: SYS,
+    fontWeight: 700,
+    fontSize: "clamp(30px, 8vw, 40px)",
     margin: "0 0 8px",
+    color: "#2E3A2B",
     letterSpacing: "0.01em",
   },
-  subtitle: { fontSize: 14, color: "rgba(236,230,214,0.6)", margin: 0, lineHeight: 1.6 },
+  subtitle: { fontSize: 15, color: "#7C8878", margin: 0, lineHeight: 1.6, fontWeight: 400 },
 
-  stageWrap: { display: "flex", justifyContent: "center", marginBottom: 22 },
-  ring: {
+  stageWrap: { display: "flex", justifyContent: "center", marginBottom: 20, width: "100%" },
+  finder: {
     position: "relative",
-    width: "min(78vw, 340px)",
-    height: "min(78vw, 340px)",
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 22,
+    width: "min(94vw, 420px)",
+    aspectRatio: "3 / 4",
+    borderRadius: 24,
+    border: "none",
+    background: "#fff",
+    padding: 8,
+    boxShadow: "0 8px 32px rgba(46,58,43,0.10), 0 2px 8px rgba(46,58,43,0.06)",
   },
-  circleMask: {
+  finderInner: {
     position: "relative",
     width: "100%",
     height: "100%",
-    borderRadius: "50%",
+    borderRadius: 18,
     overflow: "hidden",
-    background: "#181f16",
+    background: "#EDF0EA",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -366,136 +363,166 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     padding: 20,
     textAlign: "center",
   },
   placeholderText: {
-    fontSize: 12.5,
-    color: "rgba(236,230,214,0.45)",
+    fontSize: 14,
+    color: "#93A08E",
     whiteSpace: "pre-line",
-    lineHeight: 1.6,
+    lineHeight: 1.7,
+    fontWeight: 400,
   },
   liveBadge: {
     position: "absolute",
-    top: 6,
-    left: "50%",
-    transform: "translateX(-50%)",
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 10.5,
-    letterSpacing: "0.08em",
+    top: 12,
+    left: 12,
+    fontFamily: SYS,
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#3D4A3A",
     display: "flex",
     alignItems: "center",
     gap: 6,
-    background: "rgba(12,16,11,0.75)",
-    padding: "4px 10px",
-    borderRadius: 20,
-    border: "1px solid rgba(236,230,214,0.15)",
+    background: "rgba(255,255,255,0.92)",
+    padding: "5px 12px",
+    borderRadius: 999,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
   },
-  liveDot: { width: 6, height: 6, borderRadius: "50%", display: "inline-block" },
+  liveDot: { width: 8, height: 8, borderRadius: "50%", display: "inline-block" },
+
+  corner: {
+    position: "absolute",
+    width: 18,
+    height: 18,
+    border: "2.5px solid",
+    borderRadius: 2,
+    opacity: 0.85,
+  },
+  cornerTL: { top: 10, left: 10, borderRight: "none", borderBottom: "none" },
+  cornerTR: { top: 10, right: 10, borderLeft: "none", borderBottom: "none" },
+  cornerBL: { bottom: 10, left: 10, borderRight: "none", borderTop: "none" },
+  cornerBR: { bottom: 10, right: 10, borderLeft: "none", borderTop: "none" },
 
   errorBox: {
     display: "flex",
     gap: 8,
     maxWidth: 380,
-    fontSize: 12.5,
+    fontSize: 13,
     lineHeight: 1.6,
-    color: "#E8C8B8",
-    background: "rgba(217,136,102,0.08)",
-    border: "1px solid rgba(217,136,102,0.3)",
-    borderRadius: 10,
-    padding: "10px 12px",
-    marginBottom: 18,
+    color: "#A85A38",
+    background: "#FDEEE5",
+    border: "none",
+    borderRadius: 14,
+    padding: "12px 14px",
+    marginBottom: 16,
+    fontWeight: 400,
+    boxShadow: "0 2px 8px rgba(168,90,56,0.08)",
   },
 
-  speciesRow: { display: "flex", gap: 10, marginBottom: 18 },
+  speciesRow: { display: "flex", gap: 8, marginBottom: 18 },
   speciesBtn: {
     display: "flex",
     alignItems: "center",
     gap: 7,
-    padding: "9px 16px",
-    borderRadius: 24,
-    border: "1px solid",
-    background: "transparent",
+    padding: "10px 20px",
+    borderRadius: 999,
+    border: "none",
     cursor: "pointer",
-    fontFamily: "'Inter', sans-serif",
-    fontSize: 13.5,
+    fontFamily: SYS,
+    fontSize: 15,
   },
 
   dataCard: {
-    width: "min(90vw, 380px)",
-    border: "1px solid",
-    borderRadius: 12,
-    padding: "14px 16px",
-    background: "rgba(236,230,214,0.03)",
-    marginBottom: 26,
+    width: "min(94vw, 420px)",
+    border: "none",
+    borderRadius: 20,
+    padding: "18px 20px",
+    marginBottom: 24,
+    background: "#fff",
+    boxShadow: "0 4px 20px rgba(46,58,43,0.08)",
   },
-  dataRow: {
+  dataTitle: {
     display: "flex",
-    justifyContent: "space-between",
-    gap: 14,
-    padding: "6px 0",
-    borderBottom: "1px solid rgba(236,230,214,0.08)",
+    alignItems: "center",
+    gap: 8,
+    fontFamily: SYS,
+    fontSize: 16,
+    fontWeight: 700,
+    color: "#2E3A2B",
+    marginBottom: 8,
+  },
+  dataDesc: { fontSize: 14, lineHeight: 1.65, color: "#5C6858", margin: "0 0 12px", fontWeight: 400 },
+  chipRow: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+  chip: {
     fontSize: 12.5,
+    fontWeight: 500,
+    color: "#5C6858",
+    background: "#F1F4EF",
+    padding: "6px 12px",
+    borderRadius: 999,
   },
-  dataLabel: {
-    fontFamily: "'JetBrains Mono', monospace",
-    color: "rgba(236,230,214,0.45)",
-    flexShrink: 0,
-  },
-  dataValue: { textAlign: "right", color: "rgba(236,230,214,0.85)", lineHeight: 1.5 },
+  dataNote: { fontSize: 13, lineHeight: 1.6, color: "#93A08E", margin: 0, fontWeight: 400 },
 
   controls: {
     display: "flex",
     flexWrap: "wrap",
     justifyContent: "center",
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 22,
   },
   primaryBtn: {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    padding: "11px 18px",
-    borderRadius: 10,
-    border: "1px solid #6FB89A",
-    background: "#6FB89A",
-    color: "#0c100b",
+    padding: "14px 26px",
+    borderRadius: 999,
+    border: "none",
+    background: "#6BA368",
+    color: "#fff",
     fontWeight: 600,
-    fontSize: 13.5,
+    fontSize: 15,
+    fontFamily: SYS,
     cursor: "pointer",
+    boxShadow: "0 4px 14px rgba(107,163,104,0.35)",
   },
   secondaryBtn: {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    padding: "11px 18px",
-    borderRadius: 10,
-    border: "1px solid rgba(236,230,214,0.25)",
-    background: "transparent",
-    color: "#ECE6D6",
-    fontWeight: 500,
-    fontSize: 13.5,
+    padding: "14px 24px",
+    borderRadius: 999,
+    border: "none",
+    background: "#fff",
+    color: "#5C6858",
+    fontWeight: 600,
+    fontSize: 14.5,
+    fontFamily: SYS,
     cursor: "pointer",
+    boxShadow: "0 2px 10px rgba(46,58,43,0.10)",
   },
   ghostBtn: {
     display: "flex",
     alignItems: "center",
-    gap: 8,
-    padding: "11px 14px",
-    borderRadius: 10,
-    border: "1px solid transparent",
+    gap: 6,
+    padding: "14px 18px",
+    borderRadius: 999,
+    border: "none",
     background: "transparent",
-    color: "rgba(236,230,214,0.5)",
-    fontSize: 13.5,
+    color: "#93A08E",
+    fontSize: 14,
+    fontWeight: 500,
+    fontFamily: SYS,
     cursor: "pointer",
   },
 
   footnote: {
-    maxWidth: 420,
+    maxWidth: 400,
     textAlign: "center",
-    fontSize: 11,
-    lineHeight: 1.7,
-    color: "rgba(236,230,214,0.35)",
+    fontSize: 12,
+    lineHeight: 1.8,
+    color: "#93A08E",
+    fontWeight: 400,
   },
 };
